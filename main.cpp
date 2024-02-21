@@ -3,8 +3,9 @@
 #include <iomanip>
 #include <algorithm>
 #include <limits>
-#include <cstdlib>
-#include <ctime>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
 struct Studentas {
     std::string Vardas;
@@ -15,25 +16,6 @@ struct Studentas {
     double GalutinisMed;
 };
 
-// Funkcija nuskaityt ir patikrint ar naudotojo ivestas skaicius yra tinkamas
-double getValidGrade() {
-    double rez;
-    while (true) {
-        std::cin >> rez;
-        if (rez == -1) {
-            break;
-        } else if (std::cin.fail() || rez < 1.0 || rez > 10.0) {
-            std::cout << "Skaicius netinka. Iveskite reiksme nuo 1 iki 10, arba -1 jei norite pabaigti: ";
-            std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        } else {
-            break;
-        }
-    }
-    return rez;
-}
-
-
 // Funkcija suskaiciuot namu darbu vidurki
 double calculateHomeworkAverage(const std::vector<double>& paz) {
     double sum = 0.0;
@@ -42,7 +24,6 @@ double calculateHomeworkAverage(const std::vector<double>& paz) {
     }
     return paz.empty() ? 0.0 : sum / paz.size();
 }
-
 
 // Funkcija suskaiciuot namu darbu rezultatu mediana
 double calculateMedian(std::vector<double> paz) {
@@ -58,82 +39,88 @@ double calculateMedian(std::vector<double> paz) {
     }
 }
 
-
 // Funkcija suskaiciuot galutini rezultata
 double calculateFinalGrade(double ND, double EGZ) {
     return 0.4 * ND + 0.6 * EGZ;
-}
-
-// Atsitiktinai generuotas skaicius nuo 1 iki 10
-double generateRandomGrade() {
-    int randomNumber = rand() % 10 + 1;
-    return randomNumber;
 }
 
 int main() {
     std::vector<Studentas> studentai;
     Studentas temp;
 
-    srand(time(0));
+    //Atidaryti input faila
+    std::ifstream file("studentai10000.txt");
+    if (!file.is_open()) {
+        std::cerr << "Neisejo atidaryti input failo '" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+     // Atidaryti output faila
+    std::ofstream outfile("studentai_rezultatai.txt");
+    if (!outfile.is_open()) {
+        std::cerr << "Neisejo atidaryti output failo." << std::endl;
+        return EXIT_FAILURE;
+    }
     
     std::cout << std::fixed << std::setprecision(2);
 
-    while (true) {
-        std::cout << "Iveskite studento varda (arba 'exit' jei norite pabaigti): ";
-        std::cin >> temp.Vardas;
-        if (temp.Vardas == "exit") break;
+    std::string line;
+    
+    // Ignoruoti pirma input eilute
+    std::getline(file, line);
 
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-        std::cout << "Iveskite studento pavarde: ";
-        std::getline(std::cin, temp.Pavarde);
-
-        std::cout << "Atsitiktinai generuoti pazymius? (y/n): ";
-        char choice;
-        std::cin >> choice;
-        if (choice == 'y') {
-            std::cout << "Iveskite namu darbu ivertinimu kieki: ";
-            int numGrades;
-            std::cin >> numGrades;
-            for (int i = 0; i < numGrades; ++i) {
-                temp.ND.push_back(generateRandomGrade());}
+    while (getline(file, line)) {
+        std::istringstream iss(line);
+        Studentas temp;
+        iss >> temp.Vardas >> temp.Pavarde;
+        
+        double grade;
+        while (iss >> grade) {
+            // Nuskaityti ir laikyti ND rezultatus vektoriuje
+            temp.ND.push_back(grade);
         }
-        else{
-        std::cout << "Iveskite studento namu darbu ivertinima (arba -1 kad pabaigti): ";
-        double gradeInput;
-        while (true) {
-            gradeInput = getValidGrade();
-            if (gradeInput == -1) break;
-            temp.ND.push_back(gradeInput);
+        
+        // Patikrinti ar tinkamas paskutinis skaicius (egzamo rezultatas) ir perkelti ji i ND vektoriu
+        if (!temp.ND.empty() && temp.ND.back() >= 1.0 && temp.ND.back() <= 10.0) {
+            temp.EGZ = temp.ND.back();
+            temp.ND.pop_back();
+        } else {
+            std::cerr << "Error: Netinkamas arba nera egzamino rezultato '" << temp.Vardas << " " << temp.Pavarde << "'." << std::endl;
+            continue; // Praleisti studenta jei egzamino rezultatas yra netinkamas arba nera
         }
 
-        std::cout << "Iveskite studento egzamino rezultata: ";
-        temp.EGZ = getValidGrade();
-        }
+        // Validate homework grades and remove invalid ones
+        temp.ND.erase(std::remove_if(temp.ND.begin(), temp.ND.end(), [](double g){ return g < 1.0 || g > 10.0; }), temp.ND.end());
 
-        double homeworkAverage = calculateHomeworkAverage(temp.ND);
-        double homeworkMedian = calculateMedian(temp.ND);
-        temp.GalutinisVid = calculateFinalGrade(homeworkAverage, temp.EGZ);
-        temp.GalutinisMed = calculateFinalGrade(homeworkMedian, temp.EGZ);
+        temp.GalutinisVid = calculateFinalGrade(calculateHomeworkAverage(temp.ND), temp.EGZ);
+        temp.GalutinisMed = calculateFinalGrade(calculateMedian(temp.ND), temp.EGZ);
 
         studentai.push_back(temp);
         temp.ND.clear();
 
     }
 
-    std::cout << std::left;
-    std::cout << std::setw(15) << "Pavarde" << std::setw(15) << "Vardas"
-          << std::setw(20) << "Galutinis (Vid.)"
-          << std::setw(20) << "Galutinis (Med.)" << std::endl;
-    std::cout << std::string(70, '-') << std::endl;
+    file.close(); // Uzdaryti input faila
 
+    // Spausdinti antraste
+    outfile << std::left
+            << std::setw(15) << "Pavarde"
+            << std::setw(15) << "Vardas"
+            << std::setw(20) << "Galutinis (Vid.)"
+            << std::setw(20) << "Galutinis (Med.)" << std::endl;
+    outfile << std::string(70, '-') << std::endl;
 
-
+    // Spausdinami rezultatai
     for (const auto& student : studentai) {
-    std::cout << std::setw(15) << student.Pavarde
-              << std::setw(15) << student.Vardas
-              << std::setw(20) << student.GalutinisVid
-              << std::setw(20) << student.GalutinisMed << std::endl;
-}
+        outfile << std::setw(15) << student.Pavarde
+                << std::setw(15) << student.Vardas;
+                outfile << std::fixed << std::setprecision(2);
+                outfile << std::setw(20) << student.GalutinisVid
+                << std::setw(20) << student.GalutinisMed << std::endl;
+    }
+
+    // Uzdaryti output faila
+    outfile.close();
+
     return 0;
 }
