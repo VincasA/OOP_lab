@@ -7,42 +7,10 @@
 #include <sstream>
 #include <vector>
 
-struct Studentas {
-    std::string Vardas;
-    std::string Pavarde;
-    std::vector<double> ND;
-    double EGZ;
-    double GalutinisVid;
-    double GalutinisMed;
-};
-
-// Funkcija suskaiciuot namu darbu vidurki
-double calculateHomeworkAverage(const std::vector<double>& paz) {
-    double sum = 0.0;
-    for (double pazymys : paz) {
-        sum += pazymys;
-    }
-    return paz.empty() ? 0.0 : sum / paz.size();
-}
-
-// Funkcija suskaiciuot namu darbu rezultatu mediana
-double calculateMedian(std::vector<double> paz) {
-    if (paz.empty()) return 0.0;
-
-    size_t size = paz.size();
-    sort(paz.begin(), paz.end());
-
-    if (size % 2 == 0) {
-        return (paz[size / 2 - 1] + paz[size / 2]) / 2.0;
-    } else {
-        return paz[size / 2];
-    }
-}
-
-// Funkcija suskaiciuot galutini rezultata
-double calculateFinalGrade(double ND, double EGZ) {
-    return 0.4 * ND + 0.6 * EGZ;
-}
+#include "Studentas.h"
+#include "calculateHomeworkAverage.h"
+#include "calculateMedian.h"
+#include "calculateFinalGrade.h"
 
 int main() {
     std::vector<Studentas> studentai;
